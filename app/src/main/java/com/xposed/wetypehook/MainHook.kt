@@ -2,58 +2,39 @@ package com.xposed.wetypehook
 
 import android.app.Activity
 import android.content.Context
-import android.content.IntentFilter
 import android.content.res.AssetManager
-import android.content.res.Configuration
 import android.content.res.Resources
-import android.graphics.Color
-import android.view.View
 import android.inputmethodservice.InputMethodService
-import android.view.inputmethod.InputMethodManager
+import android.view.View
 import com.xposed.wetypehook.wetype.hook.WeTypeResourceHooks
 import com.xposed.wetypehook.wetype.hook.WeTypeWindowHooks
 import com.xposed.wetypehook.wetype.settings.WeTypeSettings
 import com.xposed.wetypehook.xposed.HookEnvironment
 import com.xposed.wetypehook.xposed.Log
 import com.xposed.wetypehook.xposed.findMethod
-import com.xposed.wetypehook.xposed.findMethodInHierarchy
-import com.xposed.wetypehook.xposed.getObjectAs
-import com.xposed.wetypehook.xposed.getStaticObject
 import com.xposed.wetypehook.xposed.hookAfter
-import com.xposed.wetypehook.xposed.hookBefore
-import com.xposed.wetypehook.xposed.hookReplace
-import com.xposed.wetypehook.xposed.hookReturnConstant
-import com.xposed.wetypehook.xposed.invokeStaticMethodAuto
-import com.xposed.wetypehook.xposed.loadClassOrNull
-import com.xposed.wetypehook.xposed.putStaticObject
 import com.xposed.wetypehook.xposed.sameAs
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.IXposedHookZygoteInit
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import java.lang.reflect.Field
 import java.lang.reflect.Method
-import java.util.Collections
-import java.util.WeakHashMap
-import java.util.concurrent.ConcurrentHashMap
 
-private const val TAG = "miuiime"
+private const val TAG = "wetypehook"
 private const val WETYPE_PACKAGE = "com.tencent.wetype"
 private const val WETYPE_ABOUT_ACTIVITY = "com.tencent.wetype.plugin.hld.ui.ImeAboutActivity"
 private const val WETYPE_ABOUT_LOGO_ID_NAME = "ch"
 private const val WETYPE_ABOUT_LOGO_TAG_KEY = 0x4D495549
 private const val WETYPE_FONT_ASSET = "fonts/WE-Regular.ttf"
 private const val MODULE_WETYPE_FONT_ASSET = "WE-Regular.ttf"
-private const val INPUT_METHOD_ACTION = "android.view.InputMethod"
-private const val TRANSPARENT_BOTTOM_VIEW_DARK_CONTENT = 0xFFF5F5F5.toInt()
-private const val TRANSPARENT_BOTTOM_VIEW_LIGHT_CONTENT = 0xFF202020.toInt()
 
 private val WETYPE_COLOR_REPLACEMENTS = mapOf(
-    "g8" to Color.TRANSPARENT,
-    "gb" to Color.TRANSPARENT,
-    "k5" to Color.TRANSPARENT,
-    "k9" to Color.TRANSPARENT,
-    "ng" to Color.TRANSPARENT,
-    "pq" to Color.TRANSPARENT
+    "g8" to android.graphics.Color.TRANSPARENT,
+    "gb" to android.graphics.Color.TRANSPARENT,
+    "k5" to android.graphics.Color.TRANSPARENT,
+    "k9" to android.graphics.Color.TRANSPARENT,
+    "ng" to android.graphics.Color.TRANSPARENT,
+    "pq" to android.graphics.Color.TRANSPARENT
 )
 private val WETYPE_DRAWABLE_REPLACEMENTS = mapOf(
     "ic" to R.drawable.wetype_ic,
@@ -62,33 +43,7 @@ private val WETYPE_DRAWABLE_REPLACEMENTS = mapOf(
     "gj" to R.drawable.wetype_gj,
 )
 
-private data class PackageMethods(
-    val getServices: Method
-)
-
-private data class ServiceMethods(
-    val isExported: Method,
-    val getIntents: Method
-)
-
-private data class IntentMethods(
-    val getIntentFilter: Method
-)
-
 class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
-    private val miuiImeList = setOf(
-        "com.iflytek.inputmethod.miui",
-        "com.sohu.inputmethod.sogou.xiaomi",
-        "com.baidu.input_mi",
-        "com.miui.catcherpatch"
-    )
-    private val installedHookTokens = ConcurrentHashMap.newKeySet<String>()
-    private val imeDetectionCache = Collections.synchronizedMap(WeakHashMap<Any, Boolean>())
-    private val packageMethodCache = ConcurrentHashMap<Class<*>, PackageMethods>()
-    private val serviceMethodCache = ConcurrentHashMap<Class<*>, ServiceMethods>()
-    private val intentMethodCache = ConcurrentHashMap<Class<*>, IntentMethods>()
-    private var navBarColor: Int? = null
-    private var bottomViewSourceColor: Int? = null
     private lateinit var modulePath: String
     private var moduleAssetManager: AssetManager? = null
     private var moduleResources: Resources? = null
@@ -103,39 +58,11 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
     }
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
-        if (PropertyUtils["ro.miui.support_miui_ime_bottom", "0"] != "1") return
+        if (lpparam.packageName != WETYPE_PACKAGE) return
 
         HookEnvironment.init(lpparam.classLoader, TAG)
-        Log.i("miuiime is supported")
-
-        if (lpparam.packageName == "android") {
-            startPermissionHook()
-        } else {
-            startHook(lpparam)
-        }
-    }
-
-    private fun startHook(lpparam: XC_LoadPackage.LoadPackageParam) {
-        val packageName = lpparam.packageName
-        val isWeType = packageName == WETYPE_PACKAGE
-
-        if (isWeType) {
-            installWeTypeHooks(packageName)
-        }
-
-        val isNonCustomize = packageName !in miuiImeList
-        if (isNonCustomize) {
-            installBaseImeHooks(isWeType)
-        }
-
-        hookDeleteNotSupportIme(
-            "android.inputmethodservice.InputMethodServiceInjector\$MiuiSwitchInputMethodListener",
-            lpparam.classLoader
-        )
-
-        hookInputMethodModuleManager(isNonCustomize)
-
-        Log.i("Hook MIUI IME Done!")
+        Log.i("Hook WeType UI enhancements")
+        installWeTypeHooks(WETYPE_PACKAGE)
     }
 
     private fun installWeTypeHooks(sourcePackage: String) {
@@ -153,64 +80,6 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
         hookWeTypeWindowCorner()
         hookWeTypeIntentEntry()
         hookWeTypeAboutLogoEntry()
-    }
-
-    private fun installBaseImeHooks(forceTransparentBottomView: Boolean) {
-        val injectorClass = loadClassOrNull("android.inputmethodservice.InputMethodServiceInjector")
-            ?: loadClassOrNull("android.inputmethodservice.InputMethodServiceStubImpl")
-        injectorClass?.let { clazz ->
-            hookSIsImeSupport(clazz)
-            hookIsXiaoAiEnable(clazz)
-            setPhraseBgColor(clazz, forceTransparentBottomView)
-        } ?: Log.e("Failed:Class not found: InputMethodServiceInjector")
-    }
-
-    private fun hookInputMethodModuleManager(isNonCustomize: Boolean) {
-        runCatching {
-            findMethod("android.inputmethodservice.InputMethodModuleManager") {
-                name == "loadDex" && parameterTypes.sameAs(ClassLoader::class.java, String::class.java)
-            }.hookAfter { param ->
-                val targetClassLoader = param.args[0] as? ClassLoader ?: return@hookAfter
-                hookDeleteNotSupportIme(
-                    "com.miui.inputmethod.InputMethodBottomManager\$MiuiSwitchInputMethodListener",
-                    targetClassLoader
-                )
-                val bottomManagerClass = loadClassOrNull(
-                    "com.miui.inputmethod.InputMethodBottomManager",
-                    targetClassLoader
-                ) ?: run {
-                    Log.e("Failed:Class not found: com.miui.inputmethod.InputMethodBottomManager")
-                    return@hookAfter
-                }
-
-                if (isNonCustomize) {
-                    hookSIsImeSupport(bottomManagerClass)
-                    hookIsXiaoAiEnable(bottomManagerClass)
-                }
-                hookSupportImeList(bottomManagerClass)
-            }
-        }.onFailure {
-            Log.e("Failed:Hook InputMethodModuleManager.loadDex")
-            Log.i(it)
-        }
-    }
-
-    private fun hookSupportImeList(clazz: Class<*>) {
-        val token = classHookToken("getSupportIme", clazz)
-        if (!installedHookTokens.add(token)) return
-
-        runCatching {
-            clazz.getDeclaredMethod("getSupportIme").apply {
-                isAccessible = true
-            }.hookReplace { _ ->
-                val bottomViewHelper = clazz.getStaticObject("sBottomViewHelper") ?: return@hookReplace null
-                bottomViewHelper.getObjectAs<InputMethodManager>("mImm")?.enabledInputMethodList
-            }
-        }.onFailure {
-            installedHookTokens.remove(token)
-            Log.e("Failed:Hook method getSupportIme")
-            Log.i(it)
-        }
     }
 
     private fun hookActivationHeartbeat(sourcePackage: String) {
@@ -393,190 +262,4 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
             baseResources.configuration
         ).also { moduleResources = it }
     }
-
-    private fun hookSIsImeSupport(clazz: Class<*>) {
-        runCatching {
-            clazz.putStaticObject("sIsImeSupport", 1)
-            Log.i("Success:Hook field sIsImeSupport")
-        }.onFailure {
-            Log.i("Failed:Hook field sIsImeSupport")
-            Log.i(it)
-        }
-    }
-
-    private fun hookIsXiaoAiEnable(clazz: Class<*>) {
-        val token = classHookToken("isXiaoAiEnable", clazz)
-        if (!installedHookTokens.add(token)) return
-
-        runCatching {
-            clazz.getMethod("isXiaoAiEnable").hookReturnConstant(false)
-        }.onFailure {
-            installedHookTokens.remove(token)
-            Log.i("Failed:Hook method isXiaoAiEnable")
-            Log.i(it)
-        }
-    }
-
-    private fun setPhraseBgColor(clazz: Class<*>, forceTransparent: Boolean) {
-        val token = classHookToken("phraseBgColor:${forceTransparent}", clazz)
-        if (!installedHookTokens.add(token)) return
-
-        runCatching {
-            val setNavigationBarColorMethod = findMethod("com.android.internal.policy.PhoneWindow") {
-                name == "setNavigationBarColor" && parameterTypes.sameAs(Int::class.java)
-            }
-            setNavigationBarColorMethod.hookBefore { param ->
-                if (forceTransparent) {
-                    bottomViewSourceColor = param.args[0] as? Int
-                    param.args[0] = Color.TRANSPARENT
-                }
-            }
-            setNavigationBarColorMethod.hookAfter { param ->
-                if (forceTransparent) {
-                    navBarColor = Color.TRANSPARENT
-                    customizeBottomViewColor(clazz, true)
-                    return@hookAfter
-                }
-                if (param.args[0] == 0) return@hookAfter
-
-                navBarColor = param.args[0] as Int
-                customizeBottomViewColor(clazz, false)
-            }
-
-            clazz.findMethod { name == "customizeBottomViewColor" }.hookBefore { param ->
-                if (!forceTransparent) return@hookBefore
-                if (param.args.size > 1 && param.args[1] is Int) {
-                    param.args[1] = Color.TRANSPARENT
-                }
-            }
-
-            clazz.findMethod { name == "addMiuiBottomView" }.hookAfter {
-                customizeBottomViewColor(clazz, forceTransparent)
-            }
-        }.onFailure {
-            installedHookTokens.remove(token)
-            Log.i("Failed to set the color of the MiuiBottomView")
-            Log.i(it)
-        }
-    }
-
-    private fun customizeBottomViewColor(clazz: Class<*>, forceTransparent: Boolean) {
-        if (forceTransparent) {
-            val contentColor = resolveTransparentBottomViewContentColor()
-            clazz.invokeStaticMethodAuto(
-                "customizeBottomViewColor",
-                true,
-                Color.TRANSPARENT,
-                contentColor,
-                withAlpha(contentColor, 0x66)
-            )
-            return
-        }
-
-        navBarColor?.let { colorValue ->
-            val invertedColor = -0x1 - colorValue
-            clazz.invokeStaticMethodAuto(
-                "customizeBottomViewColor",
-                true,
-                colorValue,
-                invertedColor or -0x1000000,
-                invertedColor or 0x66000000
-            )
-        }
-    }
-
-    private fun resolveTransparentBottomViewContentColor(): Int {
-        val isDarkMode =
-            Resources.getSystem().configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
-                Configuration.UI_MODE_NIGHT_YES
-        return if (isDarkMode) TRANSPARENT_BOTTOM_VIEW_DARK_CONTENT else TRANSPARENT_BOTTOM_VIEW_LIGHT_CONTENT
-    }
-
-    private fun withAlpha(color: Int, alpha: Int): Int = Color.argb(
-        alpha.coerceIn(0, 255),
-        Color.red(color),
-        Color.green(color),
-        Color.blue(color)
-    )
-
-    private fun hookDeleteNotSupportIme(className: String, classLoader: ClassLoader) {
-        val token = "$className@${System.identityHashCode(classLoader)}:deleteNotSupportIme"
-        if (!installedHookTokens.add(token)) return
-
-        runCatching {
-            findMethod(className, classLoader) { name == "deleteNotSupportIme" }
-                .hookReturnConstant(null)
-        }.onFailure {
-            installedHookTokens.remove(token)
-            Log.i("Failed:Hook method deleteNotSupportIme")
-            Log.i(it)
-        }
-    }
-
-    private fun startPermissionHook() {
-        runCatching {
-            findMethod("com.android.server.pm.AppsFilterUtils") {
-                name == "canQueryViaComponents"
-            }.hookAfter { param ->
-                if (param.result == true) return@hookAfter
-                val querying = param.args[0] ?: return@hookAfter
-                val potentialTarget = param.args[1] ?: return@hookAfter
-                if (!isIme(querying)) return@hookAfter
-                if (!isIme(potentialTarget)) return@hookAfter
-                param.result = true
-            }
-        }.onFailure {
-            Log.i("Failed: Hook method canQueryViaComponents")
-            Log.i(it)
-        }
-    }
-
-    private fun isIme(androidPackage: Any): Boolean {
-        imeDetectionCache[androidPackage]?.let { return it }
-
-        val result = runCatching {
-            val packageMethods = packageMethodCache.getOrPut(androidPackage.javaClass) {
-                PackageMethods(
-                    getServices = androidPackage.javaClass.findMethodInHierarchy {
-                        name == "getServices" && parameterTypes.isEmpty()
-                    }
-                )
-            }
-            val services = packageMethods.getServices.invoke(androidPackage) as? List<*> ?: emptyList<Any>()
-            services.any { service ->
-                service ?: return@any false
-                val serviceMethods = serviceMethodCache.getOrPut(service.javaClass) {
-                    ServiceMethods(
-                        isExported = service.javaClass.findMethodInHierarchy {
-                            name == "isExported" && parameterTypes.isEmpty()
-                        },
-                        getIntents = service.javaClass.findMethodInHierarchy {
-                            name == "getIntents" && parameterTypes.isEmpty()
-                        }
-                    )
-                }
-                if (serviceMethods.isExported.invoke(service) as? Boolean != true) return@any false
-
-                val intents = serviceMethods.getIntents.invoke(service) as? List<*> ?: emptyList<Any>()
-                intents.any { intent ->
-                    intent ?: return@any false
-                    val intentMethods = intentMethodCache.getOrPut(intent.javaClass) {
-                        IntentMethods(
-                            getIntentFilter = intent.javaClass.findMethodInHierarchy {
-                                name == "getIntentFilter" && parameterTypes.isEmpty()
-                            }
-                        )
-                    }
-                    val intentFilter = intentMethods.getIntentFilter.invoke(intent) as? IntentFilter
-                    intentFilter?.matchAction(INPUT_METHOD_ACTION) == true
-                }
-            }
-        }.getOrDefault(false)
-
-        imeDetectionCache[androidPackage] = result
-        return result
-    }
-
-    private fun classHookToken(hookName: String, clazz: Class<*>): String =
-        "${clazz.name}@${System.identityHashCode(clazz.classLoader)}:$hookName"
 }

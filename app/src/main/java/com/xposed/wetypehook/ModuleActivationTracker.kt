@@ -18,12 +18,7 @@ object ModuleActivationTracker {
     const val EXTRA_SOURCE_PROCESS = "source_process"
 
     private val trustedSourcePackages = setOf(
-        "android",
-        "com.tencent.wetype",
-        "com.iflytek.inputmethod.miui",
-        "com.sohu.inputmethod.sogou.xiaomi",
-        "com.baidu.input_mi",
-        "com.miui.catcherpatch"
+        "com.tencent.wetype"
     )
 
     data class ActivationStatus(
