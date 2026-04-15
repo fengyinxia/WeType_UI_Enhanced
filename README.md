@@ -1,51 +1,46 @@
 # WeType_UI_Enhanced
 
-为微信输入法提供界面美化与窗口效果增强。
+为微信输入法（WeType）提供界面美化与窗口效果增强。
 
 > 本项目 fork 自 [NEORUAA/WeType_UI_Enhanced](https://github.com/NEORUAA/WeType_UI_Enhanced)。
 
-## 与原项目的区别
+## 项目定位
 
-- 本项目保留并继续维护的是 **WeType（微信输入法）本体的界面美化与窗口效果增强**，重点在背景、模糊、圆角、高光、按键颜色、候选栏等视觉效果。
-- 相比原项目，本项目 **不再以“解锁 MIUI 全面屏键盘限制 / 适配多输入法”为主要目标**，当前默认仅面向 `com.tencent.wetype`。
-- 原项目中面向 `android`、百度输入法、小米定制输入法、搜狗小米版等多输入法/系统侧的兼容逻辑，在本项目中已做精简，不再作为主要维护范围。
-- 设置入口与激活状态检测也围绕 WeType 做了收敛：启用模块后，可通过 WeType 关于页 logo 进入寄生设置页。
-- 如果你更需要 **MIUI 输入法限制解锁、多输入法兼容、旧版历史行为**，请优先参考上游项目；如果你更关注 **微信输入法本体的 UI 增强与体验优化**，则本项目更合适。
+- 专注 `com.tencent.wetype` 的 UI 增强与体验优化
+- 重点是背景、模糊、圆角、高光、按键与候选栏外观
+- 不再以 MIUI 全面屏限制解锁、多输入法适配为主要目标
+- 如果你更需要旧版多输入法/系统侧兼容能力，请参考上游项目
 
-## 功能特性
+## 功能
 
-- 自定义输入法窗口背景颜色与透明度
-- 调整窗口模糊强度与圆角大小
-- 开启或关闭边缘高光效果，并调节强度
-- 调整按键颜色、按键透明度与候选词背景透明度
+- 自定义窗口背景颜色与透明度
+- 调整模糊强度与圆角大小
+- 开启/关闭边缘高光并调节强度
+- 调整按键颜色、按键透明度、候选词背景透明度
 - 调整候选词背景圆角与拼音左边距
 - 支持寄生设置页：点击 WeType 关于页 logo 进入模块设置
-
-## 测试环境
-
-- 设备：Xiaomi 17 Pro
-- 系统：HyperOS 3.0.305.4
-- Android：16
-- LSPosed：v2.0.1
 
 ## 使用方法
 
 - Xposed API Version >= 93
-- 在 LSPosed 作用域中勾选微信输入法 `com.tencent.wetype`
-- 重启作用域后打开模块桌面入口
-- 若模块已生效，可直接跳转到寄生的 WeType 设置页
+- 在 LSPosed 作用域中勾选 `com.tencent.wetype`
+- 重启 WeType 作用域后打开模块
+- 也可通过 WeType 关于页 logo 进入寄生设置页
 
-## 使用说明
+## 测试环境
 
-1. 启用模块后，点击微信输入法关于页 logo 进入模块寄生的设置页。
-2. 修改设置后如未立即生效，可尝试使用“重启 WeType”按钮。
-3. 若桌面入口提示模块未启用，请确认 LSPosed 已启用模块并重启了 WeType 作用域。
+- Xiaomi 17 Pro / HyperOS 3.0.305.4 / Android 16 / LSPosed v2.0.1
+
+## 自动发布
+
+- 已配置 GitHub Actions 自动发布
+- 推送 `v*` 标签后会自动构建 release APK 并创建 GitHub Release
+- 发布前请在仓库 Secrets 中配置：
+  - `ANDROID_SIGNING_KEYSTORE_BASE64`
+  - `ANDROID_SIGNING_STORE_PASSWORD`
+  - `ANDROID_SIGNING_KEY_ALIAS`
+  - `ANDROID_SIGNING_KEY_PASSWORD`
 
 ## 下载
 
 见 Releases 页面。
-
-## 说明
-
-- 当前版本专注于 WeType 本体的界面美化与视觉效果调整。
-- 早期历史版本中的旧实现与兼容性说明已不再适用于当前精简版定位。

@@ -5,6 +5,21 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val releaseStoreFilePath = providers.environmentVariable("ANDROID_SIGNING_STORE_FILE")
+    .orElse(providers.gradleProperty("ANDROID_SIGNING_STORE_FILE"))
+val releaseStorePassword = providers.environmentVariable("ANDROID_SIGNING_STORE_PASSWORD")
+    .orElse(providers.gradleProperty("ANDROID_SIGNING_STORE_PASSWORD"))
+val releaseKeyAlias = providers.environmentVariable("ANDROID_SIGNING_KEY_ALIAS")
+    .orElse(providers.gradleProperty("ANDROID_SIGNING_KEY_ALIAS"))
+val releaseKeyPassword = providers.environmentVariable("ANDROID_SIGNING_KEY_PASSWORD")
+    .orElse(providers.gradleProperty("ANDROID_SIGNING_KEY_PASSWORD"))
+val hasReleaseSigning = listOf(
+    releaseStoreFilePath.orNull,
+    releaseStorePassword.orNull,
+    releaseKeyAlias.orNull,
+    releaseKeyPassword.orNull
+).all { !it.isNullOrBlank() }
+
 android {
     compileSdk = 37
     namespace = "com.xposed.wetypehook"
@@ -13,8 +28,19 @@ android {
         applicationId = "com.xposed.wetypehook"
         minSdk = 31
         targetSdk = 37
-        versionCode = 20
-        versionName = "1.22"
+        versionCode = 21
+        versionName = "1.0"
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(requireNotNull(releaseStoreFilePath.orNull))
+                storePassword = requireNotNull(releaseStorePassword.orNull)
+                keyAlias = requireNotNull(releaseKeyAlias.orNull)
+                keyPassword = requireNotNull(releaseKeyPassword.orNull)
+            }
+        }
     }
 
     buildTypes {
@@ -22,6 +48,9 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles("proguard-rules.pro")
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     buildFeatures {

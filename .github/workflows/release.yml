@@ -1,0 +1,95 @@
+name: Release APK
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag，例如 v1.22"
+        required: true
+        type: string
+      prerelease:
+        description: "是否标记为预发布"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}
+      ANDROID_SIGNING_KEYSTORE_BASE64: ${{ secrets.ANDROID_SIGNING_KEYSTORE_BASE64 }}
+      ANDROID_SIGNING_STORE_PASSWORD: ${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}
+      ANDROID_SIGNING_KEY_ALIAS: ${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}
+      ANDROID_SIGNING_KEY_PASSWORD: ${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: "tools platform-tools platforms;android-37"
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Prepare signing config
+        shell: bash
+        run: |
+          if [[ -z "${ANDROID_SIGNING_KEYSTORE_BASE64}" || -z "${ANDROID_SIGNING_STORE_PASSWORD}" || -z "${ANDROID_SIGNING_KEY_ALIAS}" || -z "${ANDROID_SIGNING_KEY_PASSWORD}" ]]; then
+            echo "Missing signing secrets. Please configure ANDROID_SIGNING_KEYSTORE_BASE64, ANDROID_SIGNING_STORE_PASSWORD, ANDROID_SIGNING_KEY_ALIAS, ANDROID_SIGNING_KEY_PASSWORD." >&2
+            exit 1
+          fi
+
+          keystore_path="$RUNNER_TEMP/release.keystore"
+          printf '%s' "${ANDROID_SIGNING_KEYSTORE_BASE64}" | base64 --decode > "$keystore_path"
+
+          {
+            echo "ANDROID_SIGNING_STORE_FILE=$keystore_path"
+            echo "ANDROID_SIGNING_STORE_PASSWORD=${ANDROID_SIGNING_STORE_PASSWORD}"
+            echo "ANDROID_SIGNING_KEY_ALIAS=${ANDROID_SIGNING_KEY_ALIAS}"
+            echo "ANDROID_SIGNING_KEY_PASSWORD=${ANDROID_SIGNING_KEY_PASSWORD}"
+          } >> "$GITHUB_ENV"
+
+      - name: Build release APK
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Find release APK
+        id: apk
+        shell: bash
+        run: |
+          shopt -s nullglob
+          files=(app/build/outputs/apk/release/*.apk)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No release APK found." >&2
+            exit 1
+          fi
+          printf 'path=%s\n' "${files[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_TAG }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || false }}
+          files: ${{ steps.apk.outputs.path }}
+          fail_on_unmatched_files: true
