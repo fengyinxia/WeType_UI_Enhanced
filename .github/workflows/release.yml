@@ -44,11 +44,21 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
-        with:
-          packages: "tools platform-tools platforms;android-37"
 
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
+
+      - name: Accept Android SDK licenses
+        shell: bash
+        run: yes | sdkmanager --licenses > /dev/null || true
+
+      - name: Install Android SDK packages
+        shell: bash
+        run: |
+          sdkmanager --install \
+            "platform-tools" \
+            "build-tools;37.0.0"
+          sdkmanager --channel=3 --install "platforms;android-37"
 
       - name: Prepare signing config
         shell: bash
