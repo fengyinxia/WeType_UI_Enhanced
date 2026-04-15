@@ -2,6 +2,8 @@
 
 为微信输入法提供界面美化与窗口效果增强。
 
+> 本项目 fork 自 [NEORUAA/WeType_UI_Enhanced](https://github.com/NEORUAA/WeType_UI_Enhanced)。
+
 ## 功能特性
 
 - 自定义输入法窗口背景颜色与透明度
